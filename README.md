@@ -8,8 +8,7 @@ Results of the KCL BMEIS Hackathon 2026
 - Heqing Rong (heqing.rong@kcl.ac.uk)
 - Jieun Seo (jieun.seo@kcl.ac.uk)
 - Milly Mak (milly.mak@kcl.ac.uk)
-- tbd
-- tbd
+- Joshua Astley (joshua.astley@kcl.ac.uk)
 
 ## Overview
 

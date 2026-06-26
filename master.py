@@ -117,6 +117,7 @@ def process_scan(img_path: Path, device: str, cfg: dict, ref_path: Path, mask_pa
     if brain_mask.sum() == 0:
         brain_mask = None
 
+    _log(f'Check for artefacts')
     art_cfg = cfg["check_artifacts"]
     art = detect_artifacts(
         image,
@@ -126,6 +127,7 @@ def process_scan(img_path: Path, device: str, cfg: dict, ref_path: Path, mask_pa
         class_thresholds={k: v for k, v in art_cfg["class_thresholds"].items() if v is not None} or None,
     )
 
+    _log(f'Check for contrast enhancement')
     con_cfg = cfg["check_contrast_enhancement"]
     con = detect_contrast_enhancement(
         image,
@@ -134,9 +136,10 @@ def process_scan(img_path: Path, device: str, cfg: dict, ref_path: Path, mask_pa
         bright_fraction_threshold=con_cfg["bright_fraction_threshold"],
     )
     
-  # check registration only if ref img is provided 
+  # check registration only if ref img is provided
     coreg = None
-    if ref_path is not None: 
+    if ref_path is not None:
+        _log(f'Check for coregistration with reference image')
         ref_arr = load_nifti(ref_path)
         ref_mask = get_brain_mask(ref_path) 
         min_shape = tuple(min(r,g) for r,g in zip(ref_arr.shape, image.shape))
@@ -156,6 +159,7 @@ def process_scan(img_path: Path, device: str, cfg: dict, ref_path: Path, mask_pa
         )
     
     # check fov
+    _log(f'Check for cropped FOV')
     con_cfg = cfg["check_fov"]
     fov = check_fov(
         image,
@@ -166,6 +170,7 @@ def process_scan(img_path: Path, device: str, cfg: dict, ref_path: Path, mask_pa
 
     # Metadata + per-sample feature QC. Reuses the already-loaded image and the
     # brain mask computed above, so the volume is not read from disk again.
+    _log(f'Check for metadata')
     meta_cfg = cfg.get("check_metadata", {})
     meta = metaqc.run_qc_arrays(
         str(img_path), image, brain_mask=brain_mask, thresholds=meta_cfg,

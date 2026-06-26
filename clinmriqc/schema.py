@@ -17,6 +17,11 @@ ALL_COLUMNS = [
     'contrast_enhanced', 'contrast_vessel_ratio', 'contrast_bright_voxel_fraction',
     # registration_qc()
     'coreg_flag', 'coreg_ssim', 'coreg_ncc', 'coreg_ssim_passed', 'coreg_ncc_passed',
+    # metaqc.run_qc() — metadata + image-feature QC
+    'metaqc_status', 'metaqc_reasons',
+    'metaqc_foreground_fraction', 'metaqc_intensity_mean',
+    'metaqc_intensity_std', 'metaqc_centroid_offset_mm',
+    'metaqc_metadata_status',
 ]
 
 # Regression model classes (no 'clean'); prob_clean remains empty in every row.

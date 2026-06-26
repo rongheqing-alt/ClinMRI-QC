@@ -31,6 +31,17 @@ from clinmriqc.schema import (
 
 _FLAG_COLOURS = {'GREEN': '#4ade80', 'YELLOW': '#fbbf24', 'RED': '#f87171'}
 
+_STATUS_COLOURS = {'pass': '#4ade80', 'warning': '#fbbf24', 'fail': '#f87171'}
+_STATUS_CLS     = {'pass': 'pass',    'warning': 'warn',    'fail': 'fail'}
+
+
+def _safe_float(v, fmt='.3f', fallback='—'):
+    """Format v as a float string, returning fallback if v is empty or non-numeric."""
+    try:
+        return f'{float(v):{fmt}}'
+    except (TypeError, ValueError):
+        return fallback
+
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -343,9 +354,10 @@ h2 { font-size: 11px; font-weight: 700; text-transform: uppercase;
 .badge-on  { background: #052e1644; color: #4ade80; border: 1px solid #14532d; }
 .badge-off { background: transparent; color: #475569; border: 1px solid #334155; }
 .mod { border-left: 3px solid; padding: 14px 0 4px 16px; margin-bottom: 20px; }
-.mod.art { border-color: #7c3aed; }
-.mod.con { border-color: #0284c7; }
-.mod.reg { border-color: #0f766e; }
+.mod.art  { border-color: #7c3aed; }
+.mod.con  { border-color: #0284c7; }
+.mod.reg  { border-color: #0f766e; }
+.mod.meta { border-color: #d97706; }
 .mod-title { font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
              text-transform: uppercase; color: #475569; margin-bottom: 10px; }
 .prob-row  { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
@@ -577,14 +589,14 @@ def _contrast_section_html(row: dict) -> str:
       <span class="verdict {vcls}">{vtext}</span>
       <div class="metric-grid" style="margin-top:14px">
         <div class="metric-box">
-          <div class="metric-val">{float(vr):.3f}</div>
+          <div class="metric-val">{_safe_float(vr, ".3f")}</div>
           <div class="metric-lbl">Vessel Intensity Ratio (P99.9 / P50)</div>
           <div style="font-size:11px;color:#475569;margin-top:6px">
             Native T1w: 1.2–1.4 &nbsp;·&nbsp; Post-gadolinium: 1.6–2.0
           </div>
         </div>
         <div class="metric-box">
-          <div class="metric-val">{float(bvf):.4f}</div>
+          <div class="metric-val">{_safe_float(bvf, ".4f")}</div>
           <div class="metric-lbl">Bright Voxel Fraction</div>
           <div style="font-size:11px;color:#475569;margin-top:6px">
             Vessels occupy ~0.3–1% of brain volume after contrast
@@ -632,14 +644,14 @@ def _coreg_section_html(row: dict) -> str:
       <span class="verdict {vcls}">{flag_text}</span>
       <div class="metric-grid" style="margin-top:14px">
         <div class="metric-box">
-          <div class="metric-val">{float(ssim):.4f}</div>
+          <div class="metric-val">{_safe_float(ssim, ".4f")}</div>
           <div class="metric-lbl">SSIM &nbsp;(threshold ≥ 0.70)</div>
           <div class="{"metric-ok" if ssim_passed else "metric-bad"}" style="margin-top:6px">
             {"✓ Pass" if ssim_passed else "✗ Fail"}
           </div>
         </div>
         <div class="metric-box">
-          <div class="metric-val">{float(ncc):.4f}</div>
+          <div class="metric-val">{_safe_float(ncc, ".4f")}</div>
           <div class="metric-lbl">NCC &nbsp;(threshold ≥ 0.80)</div>
           <div class="{"metric-ok" if ncc_passed else "metric-bad"}" style="margin-top:6px">
             {"✓ Pass" if ncc_passed else "✗ Fail"}
@@ -650,17 +662,119 @@ def _coreg_section_html(row: dict) -> str:
     </div>'''
 
 
+def _metaqc_section_html(row: dict) -> str:
+    status = _val(row, 'metaqc_status')
+    if status == '':
+        return ''
+
+    col  = _STATUS_COLOURS.get(status, '#94a3b8')
+    vcls = _STATUS_CLS.get(status, 'warn')
+    status_text = {'pass': '✓ Metadata & features OK',
+                   'warning': '⚠ Warnings detected',
+                   'fail': '✗ One or more checks failed'}.get(status, status)
+
+    ff_raw  = _val(row, 'metaqc_foreground_fraction')
+    mean_raw = _val(row, 'metaqc_intensity_mean')
+    std_raw  = _val(row, 'metaqc_intensity_std')
+    com_raw  = _val(row, 'metaqc_centroid_offset_mm')
+    meta_st  = _val(row, 'metaqc_metadata_status')
+
+    def _ff_cls(ff_str):
+        try:
+            ff = float(ff_str)
+            if ff < 0.05: return 'metric-bad',  f'✗ Very low ({ff:.1%}) — possible empty volume'
+            if ff < 0.10: return 'metric-warn', f'⚠ Low ({ff:.1%}) — check coverage'
+            return 'metric-ok', f'✓ {ff:.1%}'
+        except (TypeError, ValueError):
+            return 'metric-warn', '—'
+
+    def _com_cls(com_str):
+        try:
+            v = float(com_str)
+            if v > 30: return 'metric-warn', f'⚠ {v:.1f} mm — brain off-centre?'
+            return 'metric-ok', f'✓ {v:.1f} mm'
+        except (TypeError, ValueError):
+            return 'metric-warn', '—'
+
+    ff_cls_name, ff_msg   = _ff_cls(ff_raw)
+    com_cls_name, com_msg = _com_cls(com_raw)
+
+    meta_badge = ''
+    if meta_st:
+        mc  = _STATUS_COLOURS.get(meta_st, '#94a3b8')
+        meta_badge = (f'<div class="metric-ok" style="color:{mc};margin-top:4px">'
+                      f'{meta_st.upper()}</div>')
+
+    reasons_raw = _val(row, 'metaqc_reasons')
+    reasons_html = ''
+    if reasons_raw and reasons_raw != '':
+        items = [r.strip() for r in reasons_raw.split('|') if r.strip()]
+        if items:
+            li = ''.join(f'<li style="color:#94a3b8;margin-bottom:4px">{r}</li>' for r in items)
+            reasons_html = f'''
+            <div class="divider"></div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:.1em;
+                        text-transform:uppercase;color:#475569;margin-bottom:8px">
+              Flagged checks
+            </div>
+            <ul style="padding-left:16px;font-size:12px;line-height:1.6">{li}</ul>'''
+
+    return f'''
+    <div class="mod meta">
+      <div class="mod-title">Metadata &amp; Image Features</div>
+      <span class="verdict {vcls}">{status_text}</span>
+      <div class="metric-grid" style="margin-top:14px">
+        <div class="metric-box">
+          <div class="metric-val">{_safe_float(ff_raw, ".3f")}</div>
+          <div class="metric-lbl">Foreground Fraction</div>
+          <div class="{ff_cls_name}" style="margin-top:5px">{ff_msg}</div>
+          <div style="font-size:11px;color:#334155;margin-top:4px">
+            Normal ≥ 0.10 · Warn &lt; 0.10 · Fail &lt; 0.05
+          </div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-val">{_safe_float(mean_raw, ".1f")}</div>
+          <div class="metric-lbl">Mean Intensity (brain)</div>
+          <div style="font-size:11px;color:#64748b;margin-top:4px">
+            std {_safe_float(std_raw, ".1f")}
+          </div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-val">{_safe_float(com_raw, ".1f")} mm</div>
+          <div class="metric-lbl">Centroid Offset</div>
+          <div class="{com_cls_name}" style="margin-top:5px">{com_msg}</div>
+          <div style="font-size:11px;color:#334155;margin-top:4px">
+            Distance from intensity centroid to geometric centre
+          </div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-val" style="font-size:14px;color:{_STATUS_COLOURS.get(meta_st, "#94a3b8")}">
+            Header QC
+          </div>
+          <div class="metric-lbl">Voxel size · Anisotropy</div>
+          {meta_badge}
+        </div>
+      </div>
+      {reasons_html}
+    </div>'''
+
+
 def _patient_full_html(row: dict, collapsed: bool = True) -> str:
     pid      = row.get('patient_id', 'unknown')
     ts       = row.get('timestamp', '')
     has_art  = _val(row, 'artifacts_quality_passed') != ''
     has_con  = _val(row, 'contrast_enhanced') != ''
     has_reg  = _val(row, 'coreg_flag') != ''
+    has_meta = _val(row, 'metaqc_status') != ''
     passed   = str(row.get('artifacts_quality_passed', '')).lower() in ('true', '1')
     detected = [d for d in (row.get('artifacts_detected') or '').split('|') if d]
 
     if has_art:
         scls, stxt = ('pass', 'PASS') if passed else ('fail', 'FAIL')
+    elif has_meta:
+        ms = _val(row, 'metaqc_status')
+        scls = _STATUS_CLS.get(ms, 'warn')
+        stxt = ms.upper() if ms else 'N/A'
     elif has_reg:
         flag = row.get('coreg_flag', '')
         scls = {'GREEN': 'pass', 'YELLOW': 'warn', 'RED': 'fail'}.get(flag, 'warn')
@@ -672,7 +786,8 @@ def _patient_full_html(row: dict, collapsed: bool = True) -> str:
         f'<span class="badge {"badge-on" if active else "badge-off"}">{lbl}</span>'
         for lbl, active in [('Artifact detection', has_art),
                              ('Contrast enhancement', has_con),
-                             ('Registration QC', has_reg)]
+                             ('Registration QC', has_reg),
+                             ('Metadata QC', has_meta)]
     )
 
     body = f'''
@@ -680,6 +795,7 @@ def _patient_full_html(row: dict, collapsed: bool = True) -> str:
     {_artifacts_section_html(row)}
     {_contrast_section_html(row)}
     {_coreg_section_html(row)}
+    {_metaqc_section_html(row)}
     <div style="font-size:11px;color:#334155;margin-top:12px">
       Results are classifier-based estimates. Review alongside visual inspection.
     </div>'''
@@ -833,13 +949,15 @@ def generate_html_from_csv(csv_path: str, output_path: str = None) -> str:
     has_artifacts = any(_val(r, 'artifacts_quality_passed') != '' for r in rows)
     has_contrast  = any(_val(r, 'contrast_enhanced') != '' for r in rows)
     has_coreg     = any(_val(r, 'coreg_flag') != '' for r in rows)
+    has_meta      = any(_val(r, 'metaqc_status') != '' for r in rows)
 
     mod_badges = ''.join(
         f'<span class="badge {"badge-on" if active else "badge-off"}"'
         f' style="margin-right:6px">{lbl}</span>'
         for lbl, active in [('Artifact detection', has_artifacts),
                              ('Contrast enhancement', has_contrast),
-                             ('Registration QC', has_coreg)]
+                             ('Registration QC', has_coreg),
+                             ('Metadata QC', has_meta)]
     )
 
     stats_html = '<div class="stat-row">'
@@ -902,6 +1020,9 @@ def generate_html_from_csv(csv_path: str, output_path: str = None) -> str:
             cols += [('coreg_flag', 'Reg. flag'),
                      ('coreg_ssim', 'SSIM'),
                      ('coreg_ncc',  'NCC')]
+        if has_meta:
+            cols += [('metaqc_status',              'Meta QC'),
+                     ('metaqc_foreground_fraction', 'Foreground')]
 
         th_html = ''.join(f'<th>{lbl}</th>' for _, lbl in cols)
         tr_html = ''
@@ -919,6 +1040,11 @@ def generate_html_from_csv(csv_path: str, output_path: str = None) -> str:
                 elif col == 'contrast_enhanced':
                     c = '#f87171' if str(v).lower() in ('true', '1') else '#4ade80'
                     v = f'<span style="color:{c}">{"Yes" if str(v).lower() in ("true","1") else "No"}</span>'
+                elif col == 'metaqc_status':
+                    c = _STATUS_COLOURS.get(str(v).lower(), '#94a3b8')
+                    v = f'<span style="color:{c};font-weight:600">{str(v).upper()}</span>'
+                elif col == 'metaqc_foreground_fraction':
+                    v = _safe_float(v, '.3f') if v else '—'
                 elif col == 'patient_id':
                     v = f'<a href="#pt-{v}" style="color:#7c3aed;text-decoration:none">{v}</a>'
                 cells += f'<td>{v}</td>'

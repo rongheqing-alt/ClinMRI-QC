@@ -29,6 +29,7 @@ def build_qc_record(
     artifacts: dict = None,
     contrast: dict = None,
     coreg: dict = None,
+    meta: dict = None,
     timestamp: str = None,
 ) -> dict:
     """Flatten module outputs into a flat dict matching the canonical CSV schema.
@@ -40,6 +41,7 @@ def build_qc_record(
     artifacts   : dict returned by detect_artifacts(), or None.
     contrast    : dict returned by detect_contrast_enhancement(), or None.
     coreg       : dict returned by registration_qc(), or None.
+    meta        : dict returned by metaqc.run_qc(), or None.
     timestamp   : ISO datetime string; defaults to now.
 
     Returns
@@ -81,5 +83,17 @@ def build_qc_record(
         passed = coreg.get('passed', {})
         record['coreg_ssim_passed'] = passed.get('ssim', '')
         record['coreg_ncc_passed']  = passed.get('ncc', '')
+
+    if meta is not None:
+        record['metaqc_status']   = meta.get('status', '')
+        reasons = meta.get('reasons', [])
+        record['metaqc_reasons']  = '|'.join(reasons) if reasons else ''
+        features = meta.get('features', {})
+        record['metaqc_foreground_fraction'] = features.get('foreground_fraction', '')
+        record['metaqc_intensity_mean']      = features.get('intensity_mean', '')
+        record['metaqc_intensity_std']       = features.get('intensity_std', '')
+        record['metaqc_centroid_offset_mm']  = features.get('centroid_offset_mm', '')
+        meta_qc = meta.get('metadata_qc', {})
+        record['metaqc_metadata_status'] = meta_qc.get('status', '')
 
     return record

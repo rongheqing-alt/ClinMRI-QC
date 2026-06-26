@@ -140,7 +140,7 @@ def run(
     output_dir: str,
     device: str,
     limit: int,
-    resume: bool,
+    overwrite: bool,
     exclude_prefix: str,
     config_path: str | None = None,
 ):
@@ -165,10 +165,12 @@ def run(
     if limit:
         image_files = image_files[:limit]
 
-    done = _already_processed(csv_path) if resume else set()
+    done = set() if overwrite else _already_processed(csv_path)
     if done:
         _log(f'Resuming: {len(done)} already done, '
              f'{len(image_files) - len(done)} remaining')
+    elif overwrite:
+        _log('Overwrite mode: reprocessing all scans')
 
     n_done = n_skip = n_errors = 0
     t_start = time.time()
@@ -235,7 +237,7 @@ def main():
                     help="'cpu' or 'cuda'  [default: auto-detect]")
     ap.add_argument('--limit',          type=int, default=None,
                     help='Process only the first N scans')
-    ap.add_argument('--no_resume',      action='store_true',
+    ap.add_argument('--overwrite',       action='store_true',
                     help='Reprocess scans already in the CSV')
     ap.add_argument('--exclude_prefix', default='synthetic_',
                     help="Skip files starting with this prefix  [default: 'synthetic_']")
@@ -248,7 +250,7 @@ def main():
         output_dir=args.output_dir,
         device=args.device,
         limit=args.limit,
-        resume=not args.no_resume,
+        overwrite=args.overwrite,
         exclude_prefix=args.exclude_prefix,
         config_path=args.config,
     )

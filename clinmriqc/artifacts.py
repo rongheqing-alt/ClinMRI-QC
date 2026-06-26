@@ -52,11 +52,11 @@ _DEFAULT_MODEL = Path(__file__).parent / "classifier" / "best_regression_model.p
 # Mindboggle healthy n=101, AOMIC healthy n=226); bias_field lowered to P97
 # because the model systematically scores all brain MRI high on inhomogeneity.
 DEFAULT_THRESHOLDS = {
-    'motion':     0.0956,
-    'noise':      0.3269,
-    'ghosting':   0.3456,
+    'motion':     0.1500,   # raised from 0.0956 (P99) — reduces false positives on clean scans
+    'noise':      0.3800,   # raised from 0.3269
+    'ghosting':   0.4500,   # raised from 0.3456
     'bias_field': 0.8818,   # P97 — P99 (0.9304) flags too few genuine outliers
-    'gibbs':      0.0568,
+    'gibbs':      0.1000,   # raised from 0.0568 — previous value flagged borderline clean scans
     'zipper':     0.0305,
 }
 

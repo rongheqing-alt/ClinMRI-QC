@@ -8,7 +8,7 @@ import os
 import tempfile
 import numpy as np
 import nibabel as nib
-from clinmriqc import metaqc
+from quickbrain import metaqc
 
 
 def _save(path, array, spacing=(1.0, 1.0, 1.0)):

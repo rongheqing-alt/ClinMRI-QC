@@ -5,7 +5,7 @@
     "sigma_factor": 3.0
   },
   "check_artifacts": {
-    "model_path": "clinmriqc/classifier/best_regression_model.pt",
+    "model_path": "quickbrain/classifier/best_regression_model.pt",
     "threshold": 0.5,
     "class_thresholds": {
       "motion":     0.1500,

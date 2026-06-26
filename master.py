@@ -55,19 +55,19 @@ from pathlib import Path
 
 import numpy as np
 
-# clinmriqc/ lives alongside this script at the repo root.
+# quickbrain/ lives alongside this script at the repo root.
 sys.path.insert(0, str(Path(__file__).parent))
 
-from clinmriqc.general          import load_nifti, get_brain_mask, load_config
-from clinmriqc.artifacts        import detect_artifacts
-from clinmriqc.contrast         import detect_contrast_enhancement
-from clinmriqc.coreg            import registration_qc
-from clinmriqc                  import metaqc
-from clinmriqc.generate_csv     import build_qc_record
-from clinmriqc.append_csv       import append_csv_record
-from clinmriqc.generate_report  import generate_html_from_csv
-from clinmriqc.classifier.model import load_regression_model
-from clinmriqc.check_fov        import check_fov
+from quickbrain.general          import load_nifti, get_brain_mask, load_config
+from quickbrain.artifacts        import detect_artifacts
+from quickbrain.contrast         import detect_contrast_enhancement
+from quickbrain.coreg            import registration_qc
+from quickbrain                  import metaqc
+from quickbrain.generate_csv     import build_qc_record
+from quickbrain.append_csv       import append_csv_record
+from quickbrain.generate_report  import generate_html_from_csv
+from quickbrain.classifier.model import load_regression_model
+from quickbrain.check_fov        import check_fov
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -176,6 +176,7 @@ def process_scan(img_path: Path, device: str, cfg: dict, ref_path: Path, mask_pa
         str(img_path), image, brain_mask=brain_mask, thresholds=meta_cfg,
     )
 
+    print(meta)
     return art, con, coreg, meta, fov
 
 

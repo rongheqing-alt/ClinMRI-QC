@@ -9,8 +9,8 @@ import os
 from pathlib import Path
 
 import pandas as pd
-from clinmriqc.contrast import detect_contrast_enhancement
-from clinmriqc.general import get_brain_mask, load_nifti
+from quickbrain.contrast import detect_contrast_enhancement
+from quickbrain.general import get_brain_mask, load_nifti
 
 VESSEL_RATIO_THRESHOLD = 1.6
 BRIGHT_FRACTION_THRESHOLD = 0.002

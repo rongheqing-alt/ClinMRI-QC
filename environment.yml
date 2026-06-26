@@ -1,4 +1,4 @@
-name: clinmriqc
+name: quickbrain
 channels:
   - conda-forge
   - nodefaults

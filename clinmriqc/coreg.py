@@ -108,8 +108,6 @@ def print_report(ref_path: str, reg_path: str,
     print(bold + "=" * width + reset)
     print(bold + "  Brain MRI Registration QC Report" + reset)
     print(bold + "=" * width + reset)
-    print(f"  Reference : {ref_path}")
-    print(f"  Registered: {reg_path}")
     print("-" * width)
     print(f"  {'Metric':<10}  {'Value':>8}  {'Threshold':>10}  {'Status'}")
     print("-" * width)
@@ -141,12 +139,11 @@ def registration_qc(
     if verbose:
         print(f"> Reference shape : {ref_arr.shape}")
         print(f"> Registered shape: {reg_arr.shape}")
-        print("> Pre-processing (shape alignment + normalisation) …")
+
 
     ref_arr, reg_arr = preprocess(ref_arr, reg_arr)
 
-    if verbose:
-        print("> Computing metrics …")
+
 
     ssim_val = compute_ssim(ref_arr, reg_arr)
     ncc_val  = compute_ncc(ref_arr, reg_arr)
@@ -186,16 +183,12 @@ def main():
         if not os.path.exists(path):
             sys.exit(f"[ERROR] {label} path does not exist: {path}")
 
-    print("> Loading reference image …")
+    
     ref_arr = load_nifti(args.reference)
-
-    print("> Loading registered image …")
     reg_arr = load_nifti(args.registered)
 
     # get brain mask 
-    print("> Generating brain mask from reference image …")
     brain_mask = get_brain_mask(args.reference)  
-
     min_shape = tuple(min(r, g) for r, g in zip(ref_arr.shape, reg_arr.shape))
     slices    = tuple(slice(0, s) for s in min_shape)
     mask_crop = brain_mask[slices]

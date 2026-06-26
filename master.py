@@ -88,7 +88,7 @@ def _already_processed(csv_path: Path) -> set:
 # Per-scan pipeline
 # ---------------------------------------------------------------------------
 
-def process_scan(img_path: Path, device: str, cfg: dict) -> tuple:
+def process_scan(img_path: Path, device: str, cfg: dict, ref_path) -> tuple:
     """Run the full QC pipeline for one scan.
 
     Args:
@@ -223,6 +223,7 @@ def run(
                 artifacts=art,
                 contrast=con,
                 meta=meta,
+                coreg=coreg,
             )
             append_csv_record(record, str(csv_path))
 

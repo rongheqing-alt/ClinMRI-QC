@@ -61,6 +61,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from clinmriqc.general          import load_nifti, get_brain_mask, load_config
 from clinmriqc.artifacts        import detect_artifacts
 from clinmriqc.contrast         import detect_contrast_enhancement
+from clinmriqc.coreg            import registration_qc
 from clinmriqc                  import metaqc
 from clinmriqc.generate_csv     import build_qc_record
 from clinmriqc.append_csv       import append_csv_record
@@ -128,6 +129,29 @@ def process_scan(img_path: Path, device: str, cfg: dict) -> tuple:
         vessel_ratio_threshold=con_cfg["vessel_ratio_threshold"],
         bright_fraction_threshold=con_cfg["bright_fraction_threshold"],
     )
+    
+  # check registration only if ref img is provided 
+    coreg = None
+    if ref_path is not None: 
+        ref_arr = load_nifti(ref_path)
+        ref_mask = get_brain_mask(ref_path) 
+        min_shape = tuple(min(r,g) for r,g in zip(ref_arr.shape, image.shape))
+        slices = tuple(slice(0,s) for s in min_shape)
+        mask_crop = ref_mask[slices]
+        ref_brain = ref_arr.copy()
+        reg_brain = image.copy()
+        ref_brain[~mask_crop] = 0.0
+        reg_brain[~mask_crop] = 0.0
+ 
+        coreg = registration_qc(
+            ref_arr  = ref_brain,
+            reg_arr  = reg_brain,
+            ref_path = ref_path,
+            reg_path = str(img_path),
+            verbose  = True,
+        )
+
+    
 
     # Metadata + per-sample feature QC. Reuses the already-loaded image and the
     # brain mask computed above, so the volume is not read from disk again.
@@ -136,7 +160,7 @@ def process_scan(img_path: Path, device: str, cfg: dict) -> tuple:
         str(img_path), image, brain_mask=brain_mask, thresholds=meta_cfg,
     )
 
-    return art, con, meta
+    return art, con, coreg, meta
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +175,7 @@ def run(
     resume: bool,
     exclude_prefix: str,
     config_path: str | None = None,
+    ref_path: str = None,
 ):
     cfg = load_config(config_path)
     _log(f'Config loaded from {config_path or "default"}')
@@ -190,7 +215,7 @@ def run(
 
         t0 = time.time()
         try:
-            art, con, meta = process_scan(img_path, device, cfg)
+            art, con, coreg, meta = process_scan(img_path, device, cfg,ref_path=ref_path)
 
             record = build_qc_record(
                 image_path=img_path,
@@ -250,6 +275,9 @@ def main():
                     help="Skip files starting with this prefix  [default: 'synthetic_']")
     ap.add_argument('--config',         default=None,
                     help='Path to JSON config file  [default: config/default.json]')
+    ap.add_argument('--ref',            default=None,
+                    help='Reference image path; when provided, registration QC is run '
+                         'for every scan against this reference')
     args = ap.parse_args()
 
     run(
@@ -260,6 +288,7 @@ def main():
         resume=not args.no_resume,
         exclude_prefix=args.exclude_prefix,
         config_path=args.config,
+        ref_path=args.ref,
     )
 
 

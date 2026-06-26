@@ -3,11 +3,15 @@
 import argparse
 import os
 import sys
+import tempfile
 import warnings
 from typing import Tuple 
 import numpy as np 
 import nibabel
+import nibabel as nib
 from skimage.metrics import structural_similarity
+from scipy.ndimage import zoom
+from .general import load_nifti, get_brain_mask
 
 # thresholds 
 THRESHOLDS = {"ssim": 0.70, "ncc": 0.80,}
@@ -23,12 +27,6 @@ legend = {
     "YELLOW": "Review recommended",
     "RED":    "QC failed",
     }
-
-# load image 
-def load_nifti(path: str) -> np.ndarray: 
-    img = nibabel.load(path)
-    data = np.asanyarray(img.dataobj, dtype=np.float32)
-    return data 
 
 def preprocess(ref: np.ndarray, reg: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     min_shape = tuple(min(r, g) for r, g in zip(ref.shape, reg.shape))
@@ -128,8 +126,7 @@ def print_report(ref_path: str, reg_path: str,
     print(bold + "=" * width + reset)
     print()
 
-# core functions
-
+# core function
 def registration_qc(
     ref_arr: np.ndarray,
     reg_arr: np.ndarray,
@@ -185,7 +182,6 @@ def parse_args():
 def main():
     args = parse_args()
 
-   
     for label, path in [("Reference", args.reference), ("Registered", args.registered)]:
         if not os.path.exists(path):
             sys.exit(f"[ERROR] {label} path does not exist: {path}")
@@ -196,9 +192,26 @@ def main():
     print("> Loading registered image …")
     reg_arr = load_nifti(args.registered)
 
+    # get brain mask 
+    print("> Generating brain mask from reference image …")
+    brain_mask = get_brain_mask(args.reference)  
+
+    min_shape = tuple(min(r, g) for r, g in zip(ref_arr.shape, reg_arr.shape))
+    slices    = tuple(slice(0, s) for s in min_shape)
+    mask_crop = brain_mask[slices]
+
+    ref_brain = ref_arr.copy()
+    reg_brain = reg_arr.copy()
+    ref_brain[~mask_crop] = 0.0
+    reg_brain[~mask_crop] = 0.0
+
+    print(f"> Brain voxels: {mask_crop.sum():,} / {mask_crop.size:,} "
+          f"({100 * mask_crop.mean():.1f} %)")
+
+    # qc on brain only 
     result = registration_qc(
-        ref_arr        = ref_arr,
-        reg_arr        = reg_arr,
+        ref_arr        = ref_brain,
+        reg_arr        = reg_brain,
         ref_path       = args.reference,
         reg_path       = args.registered,
         ssim_threshold = args.ssim_threshold,
